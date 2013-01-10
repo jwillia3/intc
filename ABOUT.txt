@@ -1,0 +1,201 @@
+CONSTRUCTION
+
+DRIVER
+*	The _hex_ table is initialized so that hexadecimal
+	characters point to their corresponding values. This
+	is done for the convenience of the decoding procedures
+	in _o()_.
+*	_prog_ is the memory buffer where our program's machine
+	code will be generated. _pc_ is the "program counter"
+	and counts the bytes have been generated. _pc_ starts at
+	0 because it is static.
+*	The built-in functions are initialized next with
+	_lend()_. _lend()_ simply declares a function, and
+	changes it's address to the address of the given
+	function relative to the _prog_.
+*	_sf_ is loaded with the source file. A terse diagnostic
+	error is issued if it is unavailible. Note that _ln_,
+	line number, and _back_ are 0.
+*	Load the first non-blank character into _nc_,
+	"next character", for the lexical analyzer.
+*	__top()_ is run until there are no more tokens in the
+	file at which point it is closed and the source
+	translation phase is complete.
+*	If any unresolved references exist, an error is raised.
+*	The machine code is generated for for loading the data
+	and program pointer registers and jumping to the
+	program's main().
+*	The binary file is created and the program is run.
+
+LEXICAL ANALYSIS
+*	The lexical analyzer uses a one-token and one-character
+	look-ahead, so it assumes the first character of a
+	token is already loaded in _nc_, "next character".
+	_oc_, "old character", is technically not necessary
+	but it is convenient.
+*	Initial whitespace is skipped. Tokens can either be
+	responsible for skipping space before or after
+	themselves. This compiler makes tokens skip spaces
+	after since it has the property that _nc_ will then
+	point to the start of the next token, which slightly
+	extends the look-ahead one token and the type of the
+	second.
+*	All tokens can be classified into exactly one kind by
+	its first character. This means signed numbers are not
+	single numbers but the combination of the sign as an
+	operator and the literal positive number.
+*	_next()_ loads the next token into _tok_ and returns the
+	first character. It does not attempt to validate or
+	process the token in any way, except for setting _top_,
+	"token operator". In particular, this means that the
+	caller must read and process the characters of a string
+	after the quote. _quote()_ is processes string
+	characters and escape sequences. _back_ signals that
+	_tok_ is already loaded. This is used to implement
+	token look-ahead by calling _next()_, examining its
+	token, and setting _back_ to true.
+
+MACHINE CODE CONVENTIONS
+*	Machine code is generated immediately upon parsing. This
+	generates profoundly inefficient code but is very
+	simple to implement.
+*	_eax_ is used as "the value" of an expression. _ecx_
+	is used temporarily as the left side of binary
+	expressions.
+*	_ebp_ is used as the "base pointer". Local variables and
+	temporaries extend from _esp_ to _ebp_, the earliest
+	variables having the lowest address. _ebp_ and the word
+	after it are the old value of _esp_ and the return
+	address of the routine, respectively. _ebp+8_ and beyond
+	are the arguments, the earliest having the lowest
+	address.
+*	"cdecl" calling convention is used since the native
+	support functions use it and only the caller knows how
+	many arguments have been pushed on the stack. This means
+	the _eax_ register holds the return value, arguments are
+	stored so that the first argument has the lowest address
+	on the stack, and the caller must remove the arguments.
+*	_esi_ and _edi_ point to the base of _prog_ and the
+	data area, respectively. These ensure that every
+	variable is accessed relative to a base register and to
+	generate code for globals, functions, and locals, you
+	only need to specify which.
+*	_ebx_ points to the literal string ROM.
+*	_o()_ takes a hexadecimal string and outputs them as
+	bytes into _prog_ at _pc_. A comment explaining the
+	machine code means in assembly should follow after a
+	space. _oi()_ is generates the given machine code and
+	then outputs a word-long integer. Both functions return
+	the value of _pc_ after they are done.
+*	_patch()_ resolves a "chain" of references to all point
+	to _pc_. It first reads the value refered to at _at_ in
+	_prog_ then changes it to point to _pc_, (accounting
+	for the fact that jumps take relative addresses if
+	_rel_ is set). It does the same if the previous value
+	stored at that address was not 0. With this, an unbound
+	number of references are stored with one pointer, for
+	example _brkj_, "break jump".
+	
+PROGRAM TRANSLATION
+*	All translation routines are prefixed with an underscore
+	("_") and expression translators are suffixed with "e"
+	to avoid pre-defined name clashes with certain c
+	compilers.
+*	This compiler uses a recursive descent technique for
+	parsing statements and expressions. Each element of
+	the syntax has a routine that implements it; __exp()_
+	implements expressions, for example. Within an
+	expression, there are sub-elements like prefixes, which
+	will be implemented in __pree()_. __exp()_ will call
+	__pree()_ whenever it needs to read a prefix expression
+	hence the "descent" in "recursive descent". Expressions
+	may be embedded in expressions with parentheses, hence
+	the "recursive".
+*	__top()_ is a top-level declaration element. __decl()_
+	defines the declaration global symbol with the name and
+	type that start all declarations. If a semicolon
+	follows, the declaration was a variable. If not, this
+	is a function. Decrement the number of globals, _nglo_,
+	because it was incremented on the speculation that
+	the declaration would be a variable. _nloc_ and _npar_
+	are the number of locals and parameters, respectively.
+	_enter_ is generated to set up the stack frame. Since
+	the number of locals the function declares is not known
+	yet, the operands must be filled in after parsing the
+	body. _xor eax,eax; leave; ret_ is generated to restore
+	the previous frame and return 0. _nsym_, is reset to
+	un-declare the locals.
+*	__stmnt()_ is mostly straight-forward. The first new
+	feature comes in the implementation of _if_, which
+	uses jumps. _elsej_ and _endj_ are chains of references
+	to the else statement and the statement after the
+	entire if statement. Both are resolved with _patch()_.
+	_brkj_ and _contj_ are the reference chain to _break_
+	and the address, itself, of the top of a loop,
+	respectively. _goto_() introduces the first use of
+	_cka()_, "check attribute" to make sure that the type
+	of expression after _goto_ is a function.
+*	As discussed in the lexical analysis section, skipping
+	the space after a token allows us to preview the first
+	character of the token after the look-ahead by
+	examining _nc_. This is used to parse labels. Without
+	this, the parser would have had to have been
+	restructured to expect the first token of the element
+	to have already been loaded into _tok_, which requires
+	that every element remember to load one more token than
+	it uses.
+*	Expression parsers parses its element and returns a type
+	that may be adorned with a flag, _TAR_, which indicates
+	that it may be a target for assignment. If _TAR_ is set,
+	the value in _eax_ is the /address/ of the value of the
+	element instead of the value itself. _rval()_ follows
+	the pointer to the target value. An alternative is to
+	build /abstract syntax trees/ in one phase and then
+	traverse the trees generating code based on the more
+	informed context, and if the goal was to build an
+	optimizing compiler, this would be necessary. This
+	method requires support routines for managing the
+	expression trees as well as a more complex code
+	generation routine.
+*	__exp()_ handles assignment expressions itself, and
+	delegates the next lowest precedence operator, logical
+	expressions, to __loge()_. If an assignment operator is
+	not found, then whatever work __loge()_ has done is the
+	value of the expression. As will the other binary
+	operators, the left value is saved on the stack while
+	computing the right side. Note that assignment
+	expressions are atypical of binary expressions in that
+	they are right-associative, so it calls itself to handle
+	the right-side. That is _a=b=c_ is the same as _a=(b=c)_
+	but not _(a=b)=c_. After computing the value on the
+	right, the left value is popped to _ecx_ and the
+	operation is performed. In this case, an assignment from
+	_mov [ecx],eax_. If the target was a byte, however, the
+	opcode must be decremented to generate _mov [ecx],al_.
+	The __BIN()_ macro codifies the binary idiom and uses
+	the _opc_ table to determine what code to generate for
+	the operators based on _top_.
+*	__loge()_, too, is atypical in that both of its operands
+	are not always evaluated. The left is always evaluated
+	and if the operator is an _&&_ and the value is false,
+	jump over the right in failure. For _||_ if true, jump
+	over the right in success. Either way, _eax_ is tested
+	again and set to 0 or 1 for failure and success.
+*	__poste()_ handles calls by pre-allocating the number
+	of arguments from the stack and assigning them to
+	ascending addresses. No type checking is done because
+	no types were saved.
+*	__atome()_ is the highest precedence expression. First,
+	the special value _nil_ must be checked since it would
+	otherwise be recognized as a variable. Variables are
+	then handled. Variables are accessed via an offset from
+	the pointer register for its storage type. The _storeg_
+	table maps the storage class to the address byte for
+	the correct registers. As mentioned in the lexical
+	analysis section, strings are not processed by _next()_.
+	_quote()_ reads a single character and it is added to
+	the literal string ROM, _rom_, at _rc_. The value of
+	the expression is the offset of the first character
+	from _ebx_ which points to _rom_.
+	
+	

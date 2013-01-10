@@ -1,0 +1,12 @@
+echo "<html><body>"
+
+sed '
+s/</&lt;/g
+s/>/&gt;/g
+s:^[A-Z][A-Z ]*$:<h1>&</h1>:
+s:_\([^_][^_]*\)_:<code>\1</code>:g
+s:/\([^/]\)/:<i>\1</i>:g
+s:^[*]:<li>:
+' < ABOUT.txt
+
+echo "</body></html>"

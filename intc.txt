@@ -1,0 +1,38 @@
+		      IT'S NOT THAT COMPLICATED
+			JERRY LEE WILLIAMS JR
+			    18 JULY 2010
+			    
+prog:	decl*
+decl:	var|fun
+var:	name type?
+fun:	name \(<param>\) type? stmnt
+param:	name type?
+type:	(int|byte|any) (*|\(\))?
+stmnt:	(blk|while|if)|(var|goto|"break"|"continue"|exp)? \;)
+blk:	\{stmnt*\}
+while:	while exp stmnt
+if:	if exp stmnt (else stmnt)?
+var:	var <name type?>
+goto:	goto exp
+exp:	name|num|str|\(exp\)|fwdref name
+	exp\(<exp>\)|exp\[exp\]|as type|exp\+\+|exp--
+	!exp|&name|*exp|\+\+exp|--exp
+	exp[*/%]exp
+	exp[+-]exp
+	exp[&|^]exp
+	exp(<=|==|!=|>=|>)exp
+	exp (&&|\|\|) exp
+	exp=exp
+
+DIFFERENCES FROM C:
+	rational precedence
+		follows power (small values make big changes)
+	any type
+	no structs:
+		use pack(),upack(),upackm()
+problems:
+	initialization
+	enums
+	for loop
+	unsigned int
+	narg,strictness,vararg type
