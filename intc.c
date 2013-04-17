@@ -1,3 +1,6 @@
+// intc compiler
+// Generates machine code only for Win32 32-bit cdecl calling convention.
+// This will not run on Linux or if compiled as a 64-bit binary.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,6 +66,7 @@ char	*opc[]={
 };
 main(int argc, char **argv) {
 	int	i,ent,x;
+	int __stdcall VirtualProtect(void*,size_t,int,int*);
 	for (i=0; i<16; i++) hex["0123456789abcdef"[i]]=i;
 	lend("prnc",INT,putchar);
 	lend("inpc",INT,getchar);
@@ -87,7 +91,8 @@ main(int argc, char **argv) {
 	bin=fopen("bin","wb");
 	for (i=0;i<pc || fclose(bin);i++)
 		fputc(prog[i],bin);
-	printf("> %d\n",((int(*)()) (prog+ent-5))());
+	VirtualProtect(prog,PROG,0x40,&x);
+	printf("\n> %d\n",((int(*)()) (prog+ent-5))());
 	return 0;
 }
 // Lend the client a function from the host

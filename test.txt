@@ -1,92 +1,35 @@
-#WORD;
-#prnn	(x,base)
-#	if (x<0) {
-#		prnc(`-);
-#		return -prnn(-x,base);
-#	} else {
-#		x/base && prnn(x/base,base);
-#		prnc("0123456789abcdef"[x%base]);
-#		return x;
-#	}
-#prni	(x)	return prnn(x,10);
-#prnx	(x)	return prnn(x,16);
-#prns	(s byte*) {
-#	var	i;
-#	i=0;
-#	while (s[i])
-#		prnc(s[i++]);
-#}
-#format	(s byte*,_) {
-#	var	i,a,c,varg any*;
-#	a=i=0;
-#	varg=&_;
-#	while (s[i])
-#		if ((c=s[i++])==`%) {
-#			c=s[i++];
-#			if (c==`d)	prni(varg[a++]);
-#			else if (c==`x)	prnx(varg[a++]);
-#			else if (c==`c)	prnc(varg[a++]);
-#			else if (c==`s)	prns(varg[a++]);
-#			else if (c==`%)	prnc(`%);
-#		} else
-#			prnc(c);
-#}
-#pack	(pkg byte*, fmt byte*,_) byte*{
-#	var	i,a,c,x,o,varg any*;
-#	varg=&_;
-#	a=i=o=0;
-#	while (fmt[i])
-#		if ((c=fmt[i++])==`b)
-#			pkg[o++]=varg[a++];
-#		else if (c==`i || c==`p) {
-#			*(&pkg[o]) as int*=varg[a++];
-#			o=o+WORD;
-#		} else if (c==`h) {
-#			x=varg[a++];
-#			pkg[o++]=x;
-#			pkg[o++]=x/255;
-#		}
-#	return pkg;
-#}
-#upack	(pkg byte*, fmt byte*,_) byte*{
-#	var	i,a,c,o,p any*,varg any*;
-#	varg=&_;
-#	a=i=o=0;
-#	while (fmt[i]) {
-#		p=varg[a++] as any*;
-#		if ((c=fmt[i++])==`b)
-#			*p as int*=pkg[o++];
-#		else if (c==`i || c==`p) {
-#			*p as int*=*(&pkg[o]) as int*;
-#			o=o+WORD;
-#		} else if (c==`h)
-#			*p as int*=pkg[o++]+pkg[o++]*256;
-#	}
-#	return pkg;
-#}
-#upackm	(pkg byte*, fmt byte*, n) {
-#	var	i,c,x,o;
-#	i=o=0;
-#	while (n-->0)
-#		if ((c=fmt[i++])==`b)	o++;
-#		else if (c==`i || c==`p)o=o+WORD;
-#		else if (c==`h)		o=o+2;
-#	if ((c=fmt[i])==`b)	return pkg[o];
-#	else if (c==`i || c==`p)return *(&pkg[o]) as int*;
-#	else if (c==`h)		return pkg[o]+pkg[o+1]*256;
-#}
-#main() {
-#	WORD=4;
-#	var	q9 byte*;
-#	format("%s %x\n", "OK", 0xdead);
-#	q9="abcdef";
-#	*q9=`z as byte;
-#	prns(q9);
-#}
-#
+prnn(x,base)
+	if (x<0) {
+		prnc(`-);
+		return -prnn(-x,base);
+	} else {
+		x/base && prnn(x/base,base);
+		prnc("0123456789abcdef"[x%base]);
+		return x;
+	}
+prni(x)	return prnn(x,10);
+prnx(x)	return prnn(x,16);
+prns(s byte*) {
+	var	i;
+	i=0;
+	while (s[i])
+		prnc(s[i++]);
+}
+format	(s byte*,_) {
+	var	i,a,c,varg any*;
+	a=i=0;
+	varg=&_;
+	while (s[i])
+		if ((c=s[i++])==`%) {
+			c=s[i++];
+			if (c==`d)	prni(varg[a++]);
+			else if (c==`x)	prnx(varg[a++]);
+			else if (c==`c)	prnc(varg[a++]);
+			else if (c==`s)	prns(varg[a++]);
+			else if (c==`%)	prnc(`%);
+		} else
+			prnc(c);
+}
 main() {
-	var	q9 byte*;
-	q9="12345678";
-	*q9=`a;
-	prnc(q9[1]);
+	format("100%% %s %x%c", "OK", 0xcafe, `\n);
 }
